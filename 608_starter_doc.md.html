@@ -1,0 +1,244 @@
+     <meta charset="utf-8" emacsmode="-*- markdown -*-"><link rel="stylesheet" href="https://casual-effects.com/markdeep/latest/website.css?">
+                            **6.08 Team 44: LaserTag**
+
+Laser Tag with Arduinos
+
+
+The Hardware
+===============================================================================
+
+Example section!
+
+
+Laser Gun
+-------------------------------------------------------------------------------
+- 2 IR LEDs: to send signals, fire at 38 kHz
+- 1 Laser (Guiding Laser Diode): to see the target
+- 1 Button: to trigger the laser
+- 1 Perf board : acts as the gun
+
+![Figure [gun]: IR shooting device. 2 IR leds, 1 Laser diode, and one button soldered on a perf board. ](./images/gunpic.png width="200px" border="1")
+
+
+Reciever
+-------------------------------------------------------------------------------
+
+- 1 IR receiver : to recieve signals
+- 1 LED : for feedback, blinks if receiver receives a signal ("has been hit")
+
+![Figure [reciever]: IR recieving device. 1 IR receiver and 1 LED soldered on a perf board. ](./images/receiver.png width="200px" border="1")
+
+
+Code
+-------------------------------------------------------------------------------
+
+![Figure [code]: Code for the led Light on the reciever; code for the laser diode ](./images/code1.png width="700px" border="1")
+
+The *shoot_laser()* function takes a shoot signal as input and if the signal is true, the *laser_state* goes from *IDLE* to *SHOOT*, where the laser turns on. It stays in the *SHOOT* state for some time, and then automatically transitions to the *IDLE* state. The shoot signal becomes true once the user starts shooting the opponent.
+
+The function *light_led()* lights up the upon upon getting shot. It works very similar to *shoot_laser()*, except the input is an ID and the transition to *SHOOT* state happens when the ID is a correct ID (not -1) and not the user's own ID (cannot shoot yourself).
+
+![Figure [state_machine_1]: State Machine for lighting the laser ](./images/State_Machine.png width="500px" border="0")
+
+
+Shoot Infrared Signal
+===============================================================================
+*Code*
+
+Shoots Infrared Signal which follows a specific pattern: ON for some time, OFF for 10 ms. The signal is ON for ID*10 ms, so if the ID is 2, it is ON for 20 ms. The state of the function is *IDLE*, however it always goes to *SHOOT* state where it stays for ID*10 ms and shoots IR light for that long, and then it transitions to *TIMEOUT* state where the IR signal is turned off. At the end of the 10 ms, the state tranitions to *IDLE*.
+
+![Figure [shoot_encoded]: Code for Shooting Encoded Infrared Signal ](./images/shoot_encoded.png width="400px" border="1")
+
+*State Machine*
+
+![Figure [state_machine_2]: State Machine for shoot_encoded ](./images/state_machine_2.png width="500px" border="0")
+
+
+Shooter Identification
+===============================================================================
+
+*Identification*
+
+- How do we know who is who.
+
+![Figure [id]: Code for how we determined ID of each player ](./images/id.png width="500px" border="1")
+
+*Functions*
+
+The *decode_shot* decodes the ID of the shooter from the shooting signal. When the IR sensor starts receiving the signal, the *decode_state* transitions to the *SHOOT* state and remains in that state until the IR sensor stops getting any signal. The length of the signal is recorded and based on the singnal's length, *signal_length_to_id()* determines the shooter's ID.
+
+- Decode_Shot:  Takes in IR reading and ipdates all shooters
+
+![Figure [Decode_Shot]: Code for decoding the shooter's ID ](./images/decode.png width="500px" border="1")
+
+![Figure [state_machine_3]: State Machine for decode_shot() ](./images/state_machine_3.png width="500px" border="0")
+
+- Signal_to_length_Id:
+
+For each ID, we provide a range for how long the *ON* signal should last, and if the signal's length lies in any of those ranges, the corresponding ID is returned.
+
+![Figure [Signal_to_length_Id]: Code for signal_to_length_id ](./images/sigID.png width="500px" border="1")
+
+*Benefits*
+
+- We cannot shoot ourselves
+- Recognized who shot who
+- Helpful for serverside to calculate points.
+
+
+User Interface
+===============================================================================
+
+We made out UI very user friendly and intuitive.
+
+Home Page
+-------------------------------------------------------------------------------
+
+![Figure [homepage]: button press goes through the three options ](./images/home.png width="700px" border="1")
+
+Play
+-------------------------------------------------------------------------------
+![Figure [play]: long button press to select ](./images/play.png width="500px" border="1")
+
+Highscores and Credits
+-------------------------------------------------------------------------------
+![Figure [highscore]: long button press to select ](./images/highscores.png width="400px" border="1")
+
+![Figure [credits]: long button press to select ](./images/credits.png width="400px" border="1")
+
+Victory and Game Over
+-------------------------------------------------------------------------------
+![Figure [victory]: victory screen ](./images/victory.png height="300px" border="1")![Figure [credits]: death screen ](./images/death.png height="300px" border="1")
+
+
+How did we pull it off?
+-------------------------------------------------------------------------------
+The version of Arduino we are using doesn't have a standard way of allowing us to show images on the backlit display, so we had to build our own methods to allow that. First of all, we wrote a Python script that took in an image and produced a C++ style 3 dimensional array containing the pixels of the image in RGB format. We then copy-pasted those arrays into the Arduino code.
+
+![Figure [code]: The Python Script ](./images/pyscript.png width="300px" border="1")
+
+![Figure [code]: The pixel array for the picture of a heart ](./images/2.png width="500px" border="1")
+
+
+The next step was to convert RGB triplets into hexadecimal values that we could feed into $\texttt{tft.drawPixel()}$. The standard function $\texttt{tft.drawPixel(x, y, color)}$ takes as parameters the coordinates of the pixel ($0\leq x\leq 128, 0\leq y\leq 160$) and a color represented as a 16-bit integer. We therefore had to convert the RGB values into 16-bit integers representing the same color. This part was a bit tricky, because the each of the Red, Green, and Blue values was represented as a 8-bit integer, resulting in a total of 24 bits of information. After doing some research, we found out about RGB-565, a representation of color that uses 5 bits for Red, 6 bits for Green, and 5 bits for Blue, a total of 16 bits of information. It turns out, this is the exact color-encoding scheme $\texttt{tft.drawPixel()}$. We therefore implemented a function that converts a RGB-888 triplet to a RGB-565 triplet, and subsequently converts the RGB-565 triplet to a 16-bit value.
+
+![Figure [code]: The RGB-888 to RGB-565 convertion code ](./images/1.png width="300px" border="1")
+
+After that, it was just a matter of implementing the actuall functions that would draw the images. It was fairly straightforward to do so: $\texttt{draw_image(arr, x, y)}$ draws the image represented by the pixel array $\texttt{arr}$ on the display, with the upper left pixel of the image being displayed at coordinates $(x, y)$. $\texttt{draw_green_image(arr, x, y)}$ has the same functionality as $\texttt{draw_image(arr, x, y)}$, except it replaces the Red and Blue values of each pixel with 0, basically acting as a green filter. In that way, we were able to display both gray and green menu options, depending on whether the option is selected or not (See figure 7). Finally, we also implemented a procedure called $\texttt{clear_heart_or_bullet(arr, x, y)}$ which, as the name suggests, was used to clear the hearts and bullets from the display every time we are shot, or we shoot our laser gun. This function greately helped with the performance of our design, since we no longer had to render the whole display every time a life is removed, or a bullet is shot.
+
+![Figure [code]: The drawing functions ](./images/3.png width="400px" border="1")
+
+
+GPS Location
+===============================================================================
+
+We we able to create a mini-map that showed the location of the player using GPS data. We used mostly code from lab 3b. The minimap is a screenshot from google MAPS with a 128/160 width to height ratio. To translate the GPS coordinates into a pixel on the screen accurately, we hardcoded the geographical coordinates of the upper left corner of the minimap into our code and used that point as a frame of reference (as a matter of fact, we hard coded the coordinates of all four corners as a sanity check, however it was not necessary to do so).
+
+![Figure [credits]: Code from lab 3b that we used to extract location information from the GPS ](./images/geocode.png width="500px" border="1")
+
+
+![Figure [code]: Translating the GPS coordinates into pixels on the display ](./images/gps.png width="400px" border="1")
+
+![Figure [credits]: Red dot shows the location of the player. ](./images/geoloc.png width="200px" border="1")
+
+
+
+
+Geo-Fencing
+===============================================================================
+
+We decided to appropriate Fortnite's shrinking storm, so we implemented Geofencing. The Geofence is basically a circle that encloses buildings 34, 36 and 38, which every ten seconds reduces in size (specifically the radius of the circle is reduced by 5%). If the player ends up at some point outside the circle, they immediatley lose all of their remaining lives and out of the game. To check if at a given point in time the player is still within the cirlce, we implemented a simple function appropriately named $\texttt{point_in_circle}$. This function calculates the distance between the player and the center of the circle, and if that distance if more than the radius, it reports that the player is out of bounds.
+
+![Figure [credits]: Every 10 seconds the arena gets smaller. ](./images/geofencing.png width="800px" border="1")
+
+![Figure [credits]: code relevant to geo fencing. ](./images/fencingcode.png width="400px" border="1")
+
+
+
+Server Side
+===============================================================================
+
+![Figure [credits]: Post request and an example of how we use this for the highscores section of the game. ](./images/serverpost.png width="400px" border="1")
+
+![Figure [credits]: Get request and function send_join_request that sends a message to join the game ](./images/serverget.png width="400px" border="1")
+
+We implemented four tables within our database to record:
+- Game count (Twitter doesn't allow duplicate tweets, so we included the
+game # in the Tweet to bypass this.)
+- Number of points each player obtained in that game
+- Number of victories each player has
+- The players that are currently alive in the game
+
+Within the POST request, we have six different statuses that will be called
+during certain situations:
+- Start: This request will increment the game count and start the game,
+allowing players to join.
+- Join: This request will join the player into the database, using their
+username.
+- Out: This request will eliminate a player from the database.
+- End: This request will end the game when there is only one player left within
+the game and clear the database.
+- Shooter: This request will identify who shot the player and give that person
+a point per hit.
+- Victory: This request will returm the leaderboard containing the three
+players that have the most victories.
+
+Our GET request will return the number of players currently still within the
+game.
+We use our GET request to check if there is only one player within the game,
+and if it is so, then we can call a POST request to end the game and announce
+the winner.
+
+Twitter API
+-------------------------------------------------------------------------------
+We use the Tweepy module to post to our Twitter, @nite_laser.
+
+The server will post on twitter whenever:
+- A game starts
+- A player joins
+- A player is eliminated
+- A game ends
+
+
+![Figure [credits]: Code for updating API ](./images/api.png width="600px" border="1")
+
+At the end of the game:
+- the winner will be announced
+- highscore page will update
+- MVPs of the game will be uploaded
+
+![Figure [credits]: Twitter action ](./images/api1.png width="600px" border="1")
+
+ENERGY
+===============================================================================
+Peter Fill in here
+
+VIDEO
+===============================================================================
+![Final Video](https://www.youtube.com/watch?v=NqbRmM5m-rI)
+
+The Whole game
+-------------------------------------------------------------------------------
+This video shows how all the different parts of the game we mentioned above come together.
+
+- We start with starting a game, which the server will post on twitter.
+- The players will join by navigating our UI, when a player joins, the server posts that as well to twitter.
+- The players can play the game.
+- When you "shoot", the laser guides your target for 5 seconds and your ammunition reduces by 1.
+- When you get "shot", the reciever recieves the message and triggers the led; You also lose a heart on the screen.
+- When you are eliminated, this status is posted on twitter.
+- When you click the post button, if you are the only survivor of the game, you will be shown a victory screen.
+- Twitter will also show who the winner is and the MVP of the current game.
+- You can also go back to the UI to check the highscores of the entire game (not just the current game).
+
+
+Questions?
+===============================================================================
+
+Questions?  Read the docs for markdeep (the feature demo in particular). They are nice, but for 6.08-specific formatting rules, please feel free to post on Piazza!
+
+*Death by Geofencing TM*
+
+
+<style class="fallback">body{visibility:hidden}</style><script>markdeepOptions={tocStyle:'long'};</script>
+<!-- Markdeep: --><script src="https://casual-effects.com/markdeep/latest/markdeep.min.js?" charset="utf-8"></script>
